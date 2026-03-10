@@ -1,0 +1,221 @@
+{
+  "name": "Lead Enrichment and Sales Alert Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/lead-capture",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "df6a3be6-759a-46ca-b93f-03a24d52e320",
+      "name": "Receive Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        256,
+        400
+      ],
+      "webhookId": "1099f7c6-d33a-49a9-b0a7-2f870e59cd75"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apollo.io/v1/people/match",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"email\": \"={{ $json.email }}\"\n}",
+        "options": {}
+      },
+      "id": "8d997e72-0123-43bc-9780-8797d9fa4070",
+      "name": "Enrich with Apollo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        480,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "07df33ca-b01f-4d5e-827d-4fc443d5f2e5",
+      "name": "Combine Lead Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        704,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.person.organization.estimated_num_employees }}",
+              "rightValue": "50",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8c63e34f-cd91-43dd-8c24-e9943d049062",
+      "name": "Check Company Size",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        928,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<__PLACEHOLDER_VALUE__sales_channel_id__>"
+        },
+        "text": "=🔥 High-Priority Lead Alert!\n\n*Name:* {{ $json.name }}\n*Company:* {{ $json.person.organization.name }}\n*Employees:* {{ $json.person.organization.estimated_num_employees }}\n*LinkedIn:* {{ $json.person.organization.linkedin_url }}\n\nFollow up immediately for best results!",
+        "otherOptions": {}
+      },
+      "id": "d030e29d-c916-410e-98e5-a316dbcd9f10",
+      "name": "Alert Sales Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1152,
+        304
+      ],
+      "webhookId": "e6bf3577-1037-4299-9e89-518c8a81e59f"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "5eef3b33-323d-473b-847f-c4368c056824",
+      "name": "Log to Lead Database",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1152,
+        496
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "kd9fQ4EAM0MvKLdE",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "**Lead Scoring Logic**\n\nLeads are prioritized based on company size:\n\n✅ **High Priority (>50 employees)**\n→ Routed to Slack for <2 minute response time\n→ Immediate sales team follow-up\n\n📊 **Standard Priority (≤50 employees)**\n→ Logged to Google Sheets\n→ Asynchronous nurturing workflow"
+      },
+      "id": "b0f8e1d5-9ffa-494a-9472-7114e673eae4",
+      "name": "Lead Scoring Logic",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        480,
+        464
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receive Lead": {
+      "main": [
+        [
+          {
+            "node": "Enrich with Apollo",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Combine Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich with Apollo": {
+      "main": [
+        [
+          {
+            "node": "Combine Lead Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Check Company Size",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Company Size": {
+      "main": [
+        [
+          {
+            "node": "Alert Sales Team",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log to Lead Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f69d13c3-6210-42b8-8389-b1f0f12de745",
+  "meta": {
+    "instanceId": "7d924a59d79f92622d789afb240f58e1d83cfee44ce3ca707d2141ab77f664d6"
+  },
+  "id": "XQCxF0DiiOrhSe95",
+  "tags": []
+}
